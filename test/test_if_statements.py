@@ -1,14 +1,12 @@
 # Expect: Success
 # Output: 1 2
 
-if True then
+if True:
 	print(1)
-else
+else:
 	print(2)
-end
 
-if False then
+if False:
 	print(1)
-else
+else:
 	print(2)
-end
