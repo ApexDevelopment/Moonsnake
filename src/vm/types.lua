@@ -112,4 +112,76 @@ function M.py_repr(val)
     return M.py_str(val)
 end
 
+---------------------------------------------------------------------------
+-- Iterator protocol
+---------------------------------------------------------------------------
+
+--- Create a range iterator. Returns a table with _pytype="iterator"
+--- and a next() method that returns nil when exhausted.
+function M.make_range_iter(start, stop, step)
+    local current = start
+    return {
+        _pytype = "iterator",
+        next = function()
+            if step > 0 then
+                if current >= stop then return nil end
+            else
+                if current <= stop then return nil end
+            end
+            local val = current
+            current = current + step
+            return val
+        end,
+    }
+end
+
+--- Create a list iterator.
+function M.make_list_iter(list)
+    local idx = 1
+    return {
+        _pytype = "iterator",
+        next = function()
+            if idx > #list then return nil end
+            local val = list[idx]
+            idx = idx + 1
+            return val
+        end,
+    }
+end
+
+--- Get an iterator from a value (Python __iter__ protocol).
+function M.get_iter(val)
+    if type(val) == "table" and val._pytype == "iterator" then
+        return val  -- already an iterator
+    end
+    if type(val) == "table" and val._pytype == "range" then
+        return M.make_range_iter(val.start, val.stop, val.step)
+    end
+    if type(val) == "table" and val._pytype == "list" then
+        return M.make_list_iter(val)
+    end
+    if type(val) == "string" then
+        -- Iterate over characters
+        local idx = 1
+        return {
+            _pytype = "iterator",
+            next = function()
+                if idx > #val then return nil end
+                local ch = val:sub(idx, idx)
+                idx = idx + 1
+                return ch
+            end,
+        }
+    end
+    error("TypeError: '" .. M.py_str(val) .. "' object is not iterable")
+end
+
+--- Advance an iterator, returning the next value or nil if exhausted.
+function M.iter_next(iter)
+    if type(iter) == "table" and iter._pytype == "iterator" and iter.next then
+        return iter.next()
+    end
+    error("TypeError: not an iterator")
+end
+
 return M
