@@ -1,52 +1,6 @@
 # Bugs Encountered & Workarounds
 
-## Bug 1: CALL stack order was reversed
-
-**Symptom**: `TypeError: 'table: ...' is not callable` on every test.
-
-**Root cause**: The CALL opcode handler was popping `callable` before `self_or_null`. The correct stack layout (bottom to top) is:
-
-```
-callable, self_or_null, arg1, ..., argN   ← bottom to top
-```
-
-So after popping N args, the next pop is `self_or_null`, then `callable`.
-
-**Fix**: Swap the two pop calls in the CALL handler.
-
-## Bug 2: LOAD_GLOBAL push order was wrong
-
-**Symptom**: Function calls via LOAD_GLOBAL (inside Python function bodies) failed because the callable and NULL sentinel were in the wrong stack positions.
-
-**Root cause**: LOAD_GLOBAL with `push_null=1` was pushing NULL *before* the value. But `CALL` expects `callable` below `self_or_null`. So LOAD_GLOBAL should push `value` first, then `NULL` on top.
-
-**Fix**: Push value first, then conditionally push CALL_NULL.
-
-**Note**: This differs from LOAD_NAME + PUSH_NULL (separate instructions) where LOAD_NAME pushes the value and PUSH_NULL pushes NULL. The combined behavior of LOAD_GLOBAL must match that order: value below, NULL above.
-
-## Bug 3: test_if_statements.py had Lua syntax
-
-**Symptom**: Test file used `if True then ... else ... end` instead of Python's `if True: ... else: ...`.
-
-**Fix**: Corrected syntax. This was a known issue from project setup.
-
-## Bug 4: COMPARE_OP encoding was wrong
-
-**Symptom**: Comparisons like `<`, `>=` etc. inside functions produced wrong results (e.g., `COMPARE_OP cmp=10` error).
-
-**Root cause**: The comparison type was extracted with `arg >> 4`, but Python 3.13 encodes it as `arg >> 5` (lower 5 bits are flags: bit 4 = bool result flag, bits 0-3 for adaptive interpreter).
-
-**Fix**: Changed `math.floor(arg / 16)` to `math.floor(arg / 32)`.
-
-## Bug 5: BINARY_OP constants were wrong
-
-**Symptom**: `mul(3, 5)` returned 3 instead of 15 — operators were mapped incorrectly.
-
-**Root cause**: The NB_* operation constants were wrong. Correct mapping (CPython 3.13): `0=+, 1=&, 2=//, 3=<<, 4=@, 5=*, 6=%, 7=|, 8=**, 9=>>, 10=-, 11=/, 12=^`. In-place variants are +13.
-
-**Fix**: Updated the BINARY_OP dispatch table.
-
-## Bug 6: Missing cache counts for jump opcodes
+## Bug 1: Missing cache counts for jump opcodes
 
 **Symptom**: `classify(0)` returned "positive" instead of "zero" — conditional jumps inside functions were off by one word.
 
@@ -54,7 +8,7 @@ So after popping N args, the next pop is `self_or_null`, then `callable`.
 
 **Fix**: Added cache counts to `opcodes.lua` and updated all jump handlers to skip caches before computing jump targets. Verified with `python -c "from opcode import _inline_cache_entries; ..."`.
 
-## Bug 7: STORE_FAST_STORE_FAST assignment order was reversed
+## Bug 2: STORE_FAST_STORE_FAST assignment order was reversed
 
 **Symptom**: `a, b = b, a + b` tuple swap in fibonacci produced wrong results (swapped values).
 
