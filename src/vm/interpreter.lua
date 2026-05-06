@@ -502,6 +502,16 @@ function M.exec_frame(frame)
             frame:push(-val)
 
         ---------------------------------------------------------------
+        -- UNARY_INVERT  (~x == -x - 1 for integers)
+        ---------------------------------------------------------------
+        elseif opcode == op.UNARY_INVERT then
+            local val = frame:pop()
+            if type(val) ~= "number" or val ~= math.floor(val) then
+                error("TypeError: bad operand type for unary ~: '" .. types.py_str(val) .. "'")
+            end
+            frame:push(-val - 1)
+
+        ---------------------------------------------------------------
         -- COPY i — copy the i-th item from TOS to TOS
         ---------------------------------------------------------------
         elseif opcode == op.COPY then

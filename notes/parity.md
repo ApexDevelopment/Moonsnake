@@ -20,7 +20,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | BINARY_SLICE, STORE_SLICE | missing | slicing |
 | COMPARE_OP | done | |
 | IS_OP, CONTAINS_OP | done | |
-| UNARY_NOT, UNARY_NEGATIVE, UNARY_INVERT | partial | UNARY_INVERT missing |
+| UNARY_NOT, UNARY_NEGATIVE, UNARY_INVERT | done | |
 | BUILD_LIST, BUILD_TUPLE, BUILD_MAP, BUILD_SET | partial | LIST and TUPLE done; MAP and SET missing |
 | BUILD_STRING | done | f-string concatenation |
 | LIST_EXTEND, LIST_APPEND | partial | LIST_EXTEND done; LIST_APPEND missing |
