@@ -101,6 +101,13 @@ function M.py_str(val)
     if type(val) == "table" and val._pytype == "function" then
         return "<function " .. (val.name or "?") .. ">"
     end
+    if type(val) == "table" and val._pytype == "list" then
+        local parts = {}
+        for i = 1, #val do
+            parts[i] = M.py_repr(val[i])
+        end
+        return "[" .. table.concat(parts, ", ") .. "]"
+    end
     return tostring(val)
 end
 
@@ -356,6 +363,289 @@ function M.iter_next(iter)
         return iter.next()
     end
     error("TypeError: not an iterator")
+end
+
+---------------------------------------------------------------------------
+-- Attribute access: string and list method dispatch
+---------------------------------------------------------------------------
+
+-- Escape characters special inside a Lua [ ] character class.
+local function cc(chars)
+    return "[" .. chars:gsub("([%^%-%]%%])", "%%%1") .. "]"
+end
+
+local str_methods = {
+    upper = function(s) return s:upper() end,
+    lower = function(s) return s:lower() end,
+
+    strip = function(s, chars)
+        if chars == nil or chars == M.PyNone then
+            return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+        local p = cc(chars)
+        return (s:gsub("^" .. p .. "+", ""):gsub(p .. "+$", ""))
+    end,
+    lstrip = function(s, chars)
+        if chars == nil or chars == M.PyNone then return (s:gsub("^%s+", "")) end
+        return (s:gsub("^" .. cc(chars) .. "+", ""))
+    end,
+    rstrip = function(s, chars)
+        if chars == nil or chars == M.PyNone then return (s:gsub("%s+$", "")) end
+        return (s:gsub(cc(chars) .. "+$", ""))
+    end,
+
+    split = function(s, sep, maxsplit)
+        if maxsplit == nil or maxsplit == M.PyNone then maxsplit = -1 end
+        local result = { _pytype = "list" }
+        if sep == nil or sep == M.PyNone then
+            for tok in s:gmatch("%S+") do result[#result + 1] = tok end
+        else
+            local start, count = 1, 0
+            while true do
+                if maxsplit >= 0 and count >= maxsplit then
+                    result[#result + 1] = s:sub(start); break
+                end
+                local b, e = s:find(sep, start, true)
+                if not b then result[#result + 1] = s:sub(start); break end
+                result[#result + 1] = s:sub(start, b - 1)
+                start = e + 1; count = count + 1
+            end
+        end
+        return result
+    end,
+
+    join = function(s, iterable)
+        local items = {}
+        local iter = M.get_iter(iterable)
+        local v = M.iter_next(iter)
+        while v ~= nil do
+            if type(v) ~= "string" then
+                error("TypeError: sequence item must be str, not '" .. type(v) .. "'")
+            end
+            items[#items + 1] = v
+            v = M.iter_next(iter)
+        end
+        return table.concat(items, s)
+    end,
+
+    replace = function(s, old, new, count)
+        if count == nil or count == M.PyNone then count = -1 end
+        if #old == 0 then
+            local p = { new }
+            for i = 1, #s do p[#p + 1] = s:sub(i,i); p[#p + 1] = new end
+            return table.concat(p)
+        end
+        local result, start, n = {}, 1, 0
+        while true do
+            if count >= 0 and n >= count then result[#result + 1] = s:sub(start); break end
+            local b, e = s:find(old, start, true)
+            if not b then result[#result + 1] = s:sub(start); break end
+            result[#result + 1] = s:sub(start, b - 1)
+            result[#result + 1] = new
+            start = e + 1; n = n + 1
+        end
+        return table.concat(result)
+    end,
+
+    find = function(s, sub, start)
+        local ls = (start == nil or start == M.PyNone) and 0 or start
+        local lua_s = ls >= 0 and ls + 1 or math.max(1, #s + ls + 1)
+        local pos = s:find(sub, lua_s, true)
+        return pos ~= nil and pos - 1 or -1
+    end,
+    index = function(s, sub, start)
+        local ls = (start == nil or start == M.PyNone) and 0 or start
+        local lua_s = ls >= 0 and ls + 1 or math.max(1, #s + ls + 1)
+        local pos = s:find(sub, lua_s, true)
+        if not pos then error("ValueError: substring not found") end
+        return pos - 1
+    end,
+
+    startswith = function(s, prefix) return s:sub(1, #prefix) == prefix end,
+    endswith   = function(s, suffix)
+        if #suffix == 0 then return true end
+        return s:sub(-#suffix) == suffix
+    end,
+
+    count = function(s, sub)
+        if #sub == 0 then return #s + 1 end
+        local n, start = 0, 1
+        while true do
+            local b, e = s:find(sub, start, true)
+            if not b then break end
+            n = n + 1; start = e + 1
+        end
+        return n
+    end,
+
+    isdigit = function(s) return #s > 0 and s:match("^%d+$") ~= nil end,
+    isalpha = function(s) return #s > 0 and s:match("^%a+$") ~= nil end,
+    isalnum = function(s) return #s > 0 and s:match("^%w+$") ~= nil end,
+    isspace = function(s) return #s > 0 and s:match("^%s+$") ~= nil end,
+    islower = function(s) return #s > 0 and s == s:lower() and s:match("%a") ~= nil end,
+    isupper = function(s) return #s > 0 and s == s:upper() and s:match("%a") ~= nil end,
+
+    zfill = function(s, w)
+        local pad = w - #s
+        if pad <= 0 then return s end
+        local sign = s:sub(1,1)
+        if sign == "+" or sign == "-" then return sign .. string.rep("0", pad) .. s:sub(2) end
+        return string.rep("0", pad) .. s
+    end,
+    center = function(s, w, fill)
+        fill = (fill == nil or fill == M.PyNone) and " " or fill
+        local pad = w - #s
+        if pad <= 0 then return s end
+        local lp = math.floor(pad / 2)
+        return string.rep(fill, lp) .. s .. string.rep(fill, pad - lp)
+    end,
+    ljust = function(s, w, fill)
+        fill = (fill == nil or fill == M.PyNone) and " " or fill
+        local pad = w - #s
+        return pad > 0 and s .. string.rep(fill, pad) or s
+    end,
+    rjust = function(s, w, fill)
+        fill = (fill == nil or fill == M.PyNone) and " " or fill
+        local pad = w - #s
+        return pad > 0 and string.rep(fill, pad) .. s or s
+    end,
+}
+
+local list_methods = {
+    append = function(lst, item)
+        lst[#lst + 1] = item; return M.PyNone
+    end,
+    extend = function(lst, iterable)
+        local iter = M.get_iter(iterable)
+        local v = M.iter_next(iter)
+        while v ~= nil do lst[#lst + 1] = v; v = M.iter_next(iter) end
+        return M.PyNone
+    end,
+    pop = function(lst, index)
+        local n = #lst
+        if n == 0 then error("IndexError: pop from empty list") end
+        if index == nil or index == M.PyNone then index = n - 1 end
+        local lua_i = index >= 0 and index + 1 or n + index + 1
+        if lua_i < 1 or lua_i > n then error("IndexError: pop index out of range") end
+        local val = lst[lua_i]
+        table.remove(lst, lua_i)
+        return val
+    end,
+    insert = function(lst, index, item)
+        local n = #lst
+        local lua_i = index >= 0 and index + 1 or n + index + 2
+        lua_i = math.max(1, math.min(n + 1, lua_i))
+        table.insert(lst, lua_i, item)
+        return M.PyNone
+    end,
+    remove = function(lst, item)
+        for i = 1, #lst do
+            if lst[i] == item then table.remove(lst, i); return M.PyNone end
+        end
+        error("ValueError: list.remove(x): x not in list")
+    end,
+    sort = function(lst)
+        table.sort(lst, function(a, b)
+            if type(a) == type(b) then return a < b end
+            return M.py_str(a) < M.py_str(b)
+        end)
+        return M.PyNone
+    end,
+    reverse = function(lst)
+        local n = #lst
+        for i = 1, math.floor(n / 2) do lst[i], lst[n-i+1] = lst[n-i+1], lst[i] end
+        return M.PyNone
+    end,
+    index = function(lst, item, start)
+        local ls = (start == nil or start == M.PyNone) and 0 or start
+        local lua_s = ls >= 0 and ls + 1 or math.max(1, #lst + ls + 1)
+        for i = lua_s, #lst do
+            if lst[i] == item then return i - 1 end
+        end
+        error("ValueError: " .. M.py_repr(item) .. " is not in list")
+    end,
+    count = function(lst, item)
+        local n = 0
+        for i = 1, #lst do if lst[i] == item then n = n + 1 end end
+        return n
+    end,
+    clear = function(lst)
+        for i = #lst, 1, -1 do lst[i] = nil end; return M.PyNone
+    end,
+    copy = function(lst)
+        local r = { _pytype = "list" }
+        for i = 1, #lst do r[i] = lst[i] end
+        return r
+    end,
+}
+
+--- Return the named attribute from obj, or error with AttributeError.
+--- Methods are returned as raw functions taking (self, ...).
+function M.get_attr(obj, name)
+    if type(obj) == "string" then
+        local m = str_methods[name]
+        if m then return m end
+        error("AttributeError: 'str' object has no attribute '" .. name .. "'")
+    end
+    if type(obj) == "table" then
+        if obj._pytype == "list" then
+            local m = list_methods[name]
+            if m then return m end
+            error("AttributeError: 'list' object has no attribute '" .. name .. "'")
+        end
+        if obj._pytype == "function" then
+            if name == "__name__" then return obj.name or "<unknown>" end
+            error("AttributeError: 'function' object has no attribute '" .. name .. "'")
+        end
+        if obj._pytype == "NoneType" then
+            error("AttributeError: 'NoneType' object has no attribute '" .. name .. "'")
+        end
+        -- Generic object with attrs dict (class instances once classes land)
+        if obj.attrs then
+            local v = obj.attrs[name]
+            if v ~= nil then return v end
+        end
+    end
+    error("AttributeError: '" .. M.py_str(obj) .. "' object has no attribute '" .. name .. "'")
+end
+
+--- Set an attribute on obj.
+function M.set_attr(obj, name, val)
+    if type(obj) == "table" then
+        if obj.attrs == nil then obj.attrs = {} end
+        obj.attrs[name] = val
+        return
+    end
+    error("AttributeError: cannot set attribute '" .. name .. "' on " .. type(obj))
+end
+
+--- Subscript read: obj[key]  (0-based integer key for sequences).
+function M.get_subscript(obj, key)
+    if type(obj) == "string" then
+        local n = #obj
+        local i = key >= 0 and key + 1 or n + key + 1
+        if i < 1 or i > n then error("IndexError: string index out of range") end
+        return obj:sub(i, i)
+    end
+    if type(obj) == "table" and (obj._pytype == "list" or obj._pytype == nil) then
+        local n = #obj
+        local i = key >= 0 and key + 1 or n + key + 1
+        if i < 1 or i > n then error("IndexError: list index out of range") end
+        local v = obj[i]
+        return v ~= nil and v or M.PyNone
+    end
+    error("TypeError: '" .. M.py_str(obj) .. "' object is not subscriptable")
+end
+
+--- Subscript write: obj[key] = val  (0-based integer key for sequences).
+function M.set_subscript(obj, key, val)
+    if type(obj) == "table" and (obj._pytype == "list" or obj._pytype == nil) then
+        local n = #obj
+        local i = key >= 0 and key + 1 or n + key + 1
+        obj[i] = val
+        return
+    end
+    error("TypeError: '" .. M.py_str(obj) .. "' object does not support item assignment")
 end
 
 return M

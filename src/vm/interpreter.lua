@@ -658,6 +658,71 @@ function M.exec_frame(frame)
             frame:push(converted)
 
         ---------------------------------------------------------------
+        -- LOAD_ATTR namei
+        -- In 3.13, arg encodes (namei << 1) | is_method_call.
+        -- is_method=0: pop obj, push getattr(obj, name)
+        -- is_method=1: pop obj, push bound_callable, push CALL_NULL
+        --   so CALL sees: bound_callable, CALL_NULL, args... (normal call protocol)
+        ---------------------------------------------------------------
+        elseif opcode == op.LOAD_ATTR then
+            local is_method = (arg % 2) == 1
+            local namei     = math.floor(arg / 2)
+            local name      = frame:get_name(namei)
+            local obj       = frame:pop()
+            -- Skip cache entries before any error that might propagate
+            local caches = opcodes.cache_count[op.LOAD_ATTR] or 0
+            frame.ip = frame.ip + caches
+
+            local attr = types.get_attr(obj, name)
+
+            if is_method and type(attr) == "function" then
+                -- Wrap into a bound closure so CALL can invoke without self slot
+                local bound = function(...) return attr(obj, ...) end
+                frame:push(bound)
+                frame:push(CALL_NULL)
+            elseif is_method then
+                -- Plain (non-callable) attribute accessed via method opcode variant
+                frame:push(CALL_NULL)
+                frame:push(attr)
+            else
+                frame:push(attr)
+            end
+
+        ---------------------------------------------------------------
+        -- STORE_ATTR namei
+        -- Stack before: obj (TOS), value (TOS1)
+        -- Sets obj.name = value, pops both.
+        ---------------------------------------------------------------
+        elseif opcode == op.STORE_ATTR then
+            local name  = frame:get_name(arg)
+            local obj   = frame:pop()   -- TOS
+            local val   = frame:pop()   -- TOS1
+            local caches = opcodes.cache_count[op.STORE_ATTR] or 0
+            frame.ip = frame.ip + caches
+            types.set_attr(obj, name, val)
+
+        ---------------------------------------------------------------
+        -- BINARY_SUBSCR — TOS1[TOS]
+        ---------------------------------------------------------------
+        elseif opcode == op.BINARY_SUBSCR then
+            local key = frame:pop()
+            local obj = frame:pop()
+            local caches = opcodes.cache_count[op.BINARY_SUBSCR] or 0
+            frame.ip = frame.ip + caches
+            frame:push(types.get_subscript(obj, key))
+
+        ---------------------------------------------------------------
+        -- STORE_SUBSCR — TOS1[TOS] = TOS2
+        ---------------------------------------------------------------
+        elseif opcode == op.STORE_SUBSCR then
+            local key = frame:pop()   -- TOS
+            local obj = frame:pop()   -- TOS1
+            local val = frame:pop()   -- TOS2
+            local caches = opcodes.cache_count[op.STORE_SUBSCR] or 0
+            frame.ip = frame.ip + caches
+            types.set_subscript(obj, key, val)
+
+        ---------------------------------------------------------------
         -- EXTENDED_ARG — next instruction's arg is (this arg << 8 | next arg)
         ---------------------------------------------------------------
         elseif opcode == op.EXTENDED_ARG then
