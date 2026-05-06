@@ -8,35 +8,25 @@ The virtual machine is under active development and can execute a meaningful sub
 
 ## What Works
 
-- **Marshal/pyc loading**: Reads CPython 3.13 `.pyc` files (magic number 3571)
-- **Core opcodes**: LOAD_CONST, LOAD_NAME, LOAD_GLOBAL, LOAD_FAST, STORE_NAME, STORE_FAST, STORE_GLOBAL, POP_TOP, PUSH_NULL, RETURN_VALUE, RETURN_CONST, MAKE_FUNCTION, CALL
-- **Arithmetic**: BINARY_OP (`+`, `-`, `*`, `/`, `//`, `%`, `**`), including string concatenation via `+` and in-place variants (`+=`, etc.)
-- **Comparisons**: COMPARE_OP (`<`, `<=`, `==`, `!=`, `>`, `>=`)
-- **Unary ops**: UNARY_NOT, UNARY_NEGATIVE
-- **Control flow**: POP_JUMP_IF_FALSE/TRUE, POP_JUMP_IF_NONE/NOT_NONE, JUMP_FORWARD, JUMP_BACKWARD, TO_BOOL
-- **For loops**: GET_ITER, FOR_ITER, END_FOR with iterator protocol
-- **Super-instructions**: LOAD_FAST_LOAD_FAST, STORE_FAST_LOAD_FAST, STORE_FAST_STORE_FAST
-- **Collections**: BUILD_LIST, BUILD_TUPLE, LIST_EXTEND, UNPACK_SEQUENCE
-- **Identity/membership**: IS_OP, CONTAINS_OP
-- **Stack ops**: COPY, SWAP
-- **Builtins**: `print`, `len`, `type`, `range`, `int`, `str`, `abs`, `min`, `max`, `bool`
-- **Functions**: User-defined functions, recursion, multiple arguments, closures over globals
-- **String formatting**: f-strings (FORMAT_SIMPLE, FORMAT_WITH_SPEC, BUILD_STRING, CONVERT_VALUE), including format specs (`.2f`, `x`, `X`, `o`, `b`, `d`, `e`, `g`, width/alignment) and conversions (`!r`, `!s`, `!a`)
-- **Attribute access**: LOAD_ATTR / STORE_ATTR with full string and list method dispatch
-- **String methods**: `upper`, `lower`, `strip`/`lstrip`/`rstrip`, `split`, `join`, `replace`, `find`, `index`, `startswith`, `endswith`, `count`, `isdigit`, `isalpha`, `isalnum`, `isspace`, `islower`, `isupper`, `zfill`, `center`, `ljust`, `rjust`
-- **List methods**: `append`, `extend`, `pop`, `insert`, `remove`, `sort`, `reverse`, `index`, `count`, `clear`, `copy`
-- **Subscript access**: BINARY_SUBSCR / STORE_SUBSCR for strings and lists (0-based, negative indices supported)
+- Variables, arithmetic, comparisons, boolean logic
+- if/elif/else, while, for (over range, list, str)
+- Functions: user-defined, recursion, closures over globals
+- str and list with full method suites, subscript access (`s[0]`, `lst[-1]`)
+- f-strings with format specs (`.2f`, `:x`, width/alignment) and `!r`/`!s`/`!a`
+- Builtins: `print`, `len`, `range`, `int`, `str`, `bool`, `abs`, `min`, `max`, `type`
+- Marshal/pyc loading for CPython 3.13 files
+
+See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature breakdown.
 
 ## What's Not Yet Implemented
 
 - Classes and objects
 - Exception handling (try/except/finally)
-- Closures over local variables (LOAD_DEREF, STORE_DEREF, MAKE_CELL)
-- List/dict/set comprehensions
-- Dict type (BUILD_MAP, dict methods)
+- Closures over locals (LOAD_DEREF / MAKE_CELL)
+- Dict and set types
+- Comprehensions
 - Import system
-- EXTENDED_ARG (for functions with >255 locals/consts)
-- Many builtins (input, map, filter, zip, enumerate, sorted, reversed, etc.)
+- Many builtins (`enumerate`, `zip`, `map`, `filter`, `sorted`, `reversed`, …)
 
 # Testing
 
