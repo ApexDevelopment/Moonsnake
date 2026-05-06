@@ -612,6 +612,52 @@ function M.exec_frame(frame)
             end
 
         ---------------------------------------------------------------
+        -- FORMAT_SIMPLE — convert TOS to its str() representation
+        ---------------------------------------------------------------
+        elseif opcode == op.FORMAT_SIMPLE then
+            local val = frame:pop()
+            frame:push(types.py_str(val))
+
+        ---------------------------------------------------------------
+        -- FORMAT_WITH_SPEC — format TOS1 using TOS as a format spec
+        -- Stack before: ..., value, spec   (spec = TOS)
+        -- Stack after:  ..., formatted_string
+        ---------------------------------------------------------------
+        elseif opcode == op.FORMAT_WITH_SPEC then
+            local spec = frame:pop()   -- TOS: format spec string
+            local val  = frame:pop()   -- TOS1: value to format
+            frame:push(types.py_format(val, spec))
+
+        ---------------------------------------------------------------
+        -- BUILD_STRING n — concatenate top n strings into one string
+        ---------------------------------------------------------------
+        elseif opcode == op.BUILD_STRING then
+            local parts = {}
+            -- Pop in reverse so parts[1] = leftmost (bottom of n items)
+            for i = arg, 1, -1 do
+                parts[i] = frame:pop()
+            end
+            frame:push(table.concat(parts))
+
+        ---------------------------------------------------------------
+        -- CONVERT_VALUE conv — apply !s/!r/!a conversion to TOS
+        -- arg: 1 = str, 2 = repr, 3 = ascii
+        ---------------------------------------------------------------
+        elseif opcode == op.CONVERT_VALUE then
+            local val = frame:pop()
+            local converted
+            if arg == 1 then
+                converted = types.py_str(val)
+            elseif arg == 2 then
+                converted = types.py_repr(val)
+            elseif arg == 3 then
+                converted = types.py_ascii(val)
+            else
+                error(string.format("NotImplementedError: CONVERT_VALUE arg=%d", arg))
+            end
+            frame:push(converted)
+
+        ---------------------------------------------------------------
         -- EXTENDED_ARG — next instruction's arg is (this arg << 8 | next arg)
         ---------------------------------------------------------------
         elseif opcode == op.EXTENDED_ARG then

@@ -21,6 +21,7 @@ The virtual machine is under active development and can execute a meaningful sub
 - **Stack ops**: COPY, SWAP
 - **Builtins**: `print`, `len`, `type`, `range`, `int`, `str`, `abs`, `min`, `max`, `bool`
 - **Functions**: User-defined functions, recursion, multiple arguments, closures over globals
+- **String formatting**: f-strings (FORMAT_SIMPLE, FORMAT_WITH_SPEC, BUILD_STRING, CONVERT_VALUE), including format specs (`.2f`, `x`, `X`, `o`, `b`, `d`, `e`, `g`, width/alignment) and conversions (`!r`, `!s`, `!a`)
 
 ## What's Not Yet Implemented
 
@@ -29,7 +30,6 @@ The virtual machine is under active development and can execute a meaningful sub
 - Closures over local variables (LOAD_DEREF, STORE_DEREF, MAKE_CELL)
 - LOAD_ATTR / STORE_ATTR
 - List/dict/set comprehensions
-- String formatting (f-strings, FORMAT_SIMPLE, BUILD_STRING)
 - Import system
 - EXTENDED_ARG (for functions with >255 locals/consts)
 - Many builtins (input, map, filter, zip, enumerate, sorted, reversed, etc.)
@@ -52,4 +52,4 @@ Test format:
 print("hello", "world")
 ```
 
-There are currently 37 passing tests covering arithmetic, comparisons, control flow, for/while loops, recursion, function calls, builtins, and more.
+There are currently 41 passing tests covering arithmetic, comparisons, control flow, for/while loops, recursion, function calls, builtins, and string formatting.
