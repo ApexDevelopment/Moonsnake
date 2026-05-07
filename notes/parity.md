@@ -15,7 +15,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | POP_TOP, PUSH_NULL, RETURN_VALUE, RETURN_CONST | done | |
 | MAKE_FUNCTION | done | |
 | CALL, CALL_KW, CALL_FUNCTION_EX | partial | CALL done; CALL_KW, CALL_FUNCTION_EX missing |
-| BINARY_OP | done | all arithmetic + in-place variants |
+| BINARY_OP | partial | all arithmetic and bitwise ops done; matrix multiply (@) missing |
 | BINARY_SUBSCR, STORE_SUBSCR | done | 0-based, negative indices |
 | BINARY_SLICE, STORE_SLICE | missing | slicing |
 | COMPARE_OP | done | |
@@ -25,7 +25,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | BUILD_CONST_KEY_MAP | done | constant-key dict literals |
 | DELETE_SUBSCR | done | `del d[k]`, `del lst[i]` |
 | BUILD_STRING | done | f-string concatenation |
-| LIST_EXTEND, LIST_APPEND | partial | LIST_EXTEND done; LIST_APPEND missing |
+| LIST_EXTEND, LIST_APPEND | partial | LIST_EXTEND done; LIST_APPEND opcode (used in comprehensions) missing |
 | DICT_MERGE, DICT_UPDATE, SET_ADD, MAP_ADD | missing | |
 | UNPACK_SEQUENCE | done | |
 | UNPACK_EX | missing | starred unpacking |

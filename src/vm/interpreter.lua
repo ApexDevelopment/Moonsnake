@@ -10,6 +10,7 @@
 
 local opcodes = require("src.vm.opcodes")
 local types   = require("src.vm.types")
+local bit     = require("src.lib.luabit")
 
 local M = {}
 
@@ -449,6 +450,16 @@ function M.exec_frame(frame)
                 result = lhs % rhs
             elseif binop == 8 then   -- **
                 result = lhs ^ rhs
+            elseif binop == 1 then   -- &
+                result = bit.band(lhs, rhs)
+            elseif binop == 7 then   -- |
+                result = bit.bor(lhs, rhs)
+            elseif binop == 12 then  -- ^ (XOR)
+                result = bit.bxor(lhs, rhs)
+            elseif binop == 3 then   -- <<
+                result = bit.lshift(lhs, rhs)
+            elseif binop == 9 then   -- >>
+                result = bit.rshift(lhs, rhs)
             else
                 error(string.format("NotImplementedError: BINARY_OP %d not implemented", arg))
             end
