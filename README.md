@@ -15,7 +15,7 @@ The virtual machine is under active development and can execute a meaningful sub
 - Variables, arithmetic, comparisons, boolean logic
 - if/elif/else, while, for (over range, list, str)
 - Functions: user-defined, recursion, closures over globals
-- str and list with full method suites, subscript access (`s[0]`, `lst[-1]`)
+- str, dict, and list with full method suites, subscript access (`s[0]`, `lst[-1]`)
 - f-strings with format specs (`.2f`, `:x`, width/alignment) and `!r`/`!s`/`!a`
 - Builtins: `print`, `len`, `range`, `int`, `str`, `bool`, `abs`, `min`, `max`, `type`
 - Marshal/pyc loading for CPython 3.13 files
@@ -36,8 +36,8 @@ See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature bre
 
 Planned implementation order, roughly by impact-to-effort ratio.
 
-### 1. Dict type
-`BUILD_MAP`, `BINARY_SUBSCR`/`STORE_SUBSCR` on dicts, and the core dict methods (`keys`, `values`, `items`, `get`, `update`, `pop`). Unlocks memoization, frequency counting, graph adjacency maps, and most algorithms that currently need an awkward list-of-pairs workaround.
+### 1. ~~Dict type~~ ✓
+Done. `BUILD_MAP`, `BUILD_CONST_KEY_MAP`, `DELETE_SUBSCR`, dict access via `BINARY_SUBSCR`/`STORE_SUBSCR`, and the core dict methods (`keys`, `values`, `items`, `get`, `setdefault`, `pop`, `update`, `clear`, `copy`). Insertion-ordered to match Python 3.7+ semantics.
 
 ### 2. File I/O
 Add `open` as a native builtin returning a file object with `read`, `write`, `readline`, `readlines`, and context manager support (`__enter__`/`__exit__` via `BEFORE_WITH`). Makes Moonsnake useful for real text-processing scripts.

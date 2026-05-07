@@ -30,7 +30,7 @@ function M.len(obj)
         return #obj
     end
     if type(obj) == "table" then
-        -- For list-like tables (array part)
+        if obj._pytype == "dict" then return #obj.keys end
         return #obj
     end
     error("TypeError: object of type '" .. type(obj) .. "' has no len()")

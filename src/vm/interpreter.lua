@@ -591,6 +591,8 @@ function M.exec_frame(frame)
                 for _, v in ipairs(rhs) do
                     if v == lhs then found = true; break end
                 end
+            elseif type(rhs) == "table" and rhs._pytype == "dict" then
+                found = rhs.data[lhs] ~= nil
             elseif type(rhs) == "string" then
                 if type(lhs) == "string" then
                     found = rhs:find(lhs, 1, true) ~= nil
@@ -731,6 +733,50 @@ function M.exec_frame(frame)
             local caches = opcodes.cache_count[op.STORE_SUBSCR] or 0
             frame.ip = frame.ip + caches
             types.set_subscript(obj, key, val)
+
+        ---------------------------------------------------------------
+        -- DELETE_SUBSCR — del TOS1[TOS]
+        ---------------------------------------------------------------
+        elseif opcode == op.DELETE_SUBSCR then
+            local key = frame:pop()
+            local obj = frame:pop()
+            types.del_subscript(obj, key)
+
+        ---------------------------------------------------------------
+        -- BUILD_MAP n — pops 2n items (k1, v1, ..., kn, vn) into a dict
+        ---------------------------------------------------------------
+        elseif opcode == op.BUILD_MAP then
+            local d = { _pytype = "dict", keys = {}, data = {} }
+            -- Buffer pairs so we insert in stack-bottom-to-top order
+            local buf = {}
+            for i = arg, 1, -1 do
+                local v = frame:pop()
+                local k = frame:pop()
+                buf[i] = { k, v }
+            end
+            for i = 1, arg do
+                local k, v = buf[i][1], buf[i][2]
+                if d.data[k] == nil then d.keys[#d.keys + 1] = k end
+                d.data[k] = v
+            end
+            frame:push(d)
+
+        ---------------------------------------------------------------
+        -- BUILD_CONST_KEY_MAP n — TOS is a tuple of keys, TOS1..TOSn are values
+        ---------------------------------------------------------------
+        elseif opcode == op.BUILD_CONST_KEY_MAP then
+            local keys_tup = frame:pop()
+            local d = { _pytype = "dict", keys = {}, data = {} }
+            local values = {}
+            for i = arg, 1, -1 do
+                values[i] = frame:pop()
+            end
+            for i = 1, arg do
+                local k = keys_tup[i]
+                if d.data[k] == nil then d.keys[#d.keys + 1] = k end
+                d.data[k] = values[i]
+            end
+            frame:push(d)
 
         ---------------------------------------------------------------
         -- EXTENDED_ARG — next instruction's arg is (this arg << 8 | next arg)

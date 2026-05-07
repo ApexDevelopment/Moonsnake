@@ -108,6 +108,13 @@ function M.py_str(val)
         end
         return "[" .. table.concat(parts, ", ") .. "]"
     end
+    if type(val) == "table" and val._pytype == "dict" then
+        local parts = {}
+        for i, k in ipairs(val.keys) do
+            parts[i] = M.py_repr(k) .. ": " .. M.py_repr(val.data[k])
+        end
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end
     return tostring(val)
 end
 
@@ -340,6 +347,10 @@ function M.get_iter(val)
     end
     if type(val) == "table" and val._pytype == "list" then
         return M.make_list_iter(val)
+    end
+    if type(val) == "table" and val._pytype == "dict" then
+        -- Dict iteration yields keys in insertion order
+        return M.make_list_iter(val.keys)
     end
     if type(val) == "string" then
         -- Iterate over characters
@@ -579,6 +590,79 @@ local list_methods = {
     end,
 }
 
+local dict_methods = {
+    keys = function(d)
+        local r = { _pytype = "list" }
+        for i, k in ipairs(d.keys) do r[i] = k end
+        return r
+    end,
+    values = function(d)
+        local r = { _pytype = "list" }
+        for i, k in ipairs(d.keys) do r[i] = d.data[k] end
+        return r
+    end,
+    items = function(d)
+        local r = { _pytype = "list" }
+        for i, k in ipairs(d.keys) do r[i] = { k, d.data[k] } end
+        return r
+    end,
+    get = function(d, key, default)
+        local v = d.data[key]
+        if v ~= nil then return v end
+        if default == nil then return M.PyNone end
+        return default
+    end,
+    setdefault = function(d, key, default)
+        local v = d.data[key]
+        if v ~= nil then return v end
+        if default == nil then default = M.PyNone end
+        d.keys[#d.keys + 1] = key
+        d.data[key] = default
+        return default
+    end,
+    pop = function(d, key, default)
+        local v = d.data[key]
+        if v ~= nil then
+            d.data[key] = nil
+            for i, k in ipairs(d.keys) do
+                if k == key then table.remove(d.keys, i); break end
+            end
+            return v
+        end
+        if default ~= nil then return default end
+        error("KeyError: " .. M.py_repr(key))
+    end,
+    update = function(d, other)
+        if type(other) == "table" and other._pytype == "dict" then
+            for _, k in ipairs(other.keys) do
+                if d.data[k] == nil then d.keys[#d.keys + 1] = k end
+                d.data[k] = other.data[k]
+            end
+        else
+            -- Iterable of (k,v) pairs
+            local iter = M.get_iter(other)
+            local pair = M.iter_next(iter)
+            while pair ~= nil do
+                local k, v = pair[1], pair[2]
+                if d.data[k] == nil then d.keys[#d.keys + 1] = k end
+                d.data[k] = v
+                pair = M.iter_next(iter)
+            end
+        end
+        return M.PyNone
+    end,
+    clear = function(d)
+        for i = #d.keys, 1, -1 do d.keys[i] = nil end
+        for k in pairs(d.data) do d.data[k] = nil end
+        return M.PyNone
+    end,
+    copy = function(d)
+        local r = { _pytype = "dict", keys = {}, data = {} }
+        for i, k in ipairs(d.keys) do r.keys[i] = k; r.data[k] = d.data[k] end
+        return r
+    end,
+}
+
 --- Return the named attribute from obj, or error with AttributeError.
 --- Methods are returned as raw functions taking (self, ...).
 function M.get_attr(obj, name)
@@ -592,6 +676,11 @@ function M.get_attr(obj, name)
             local m = list_methods[name]
             if m then return m end
             error("AttributeError: 'list' object has no attribute '" .. name .. "'")
+        end
+        if obj._pytype == "dict" then
+            local m = dict_methods[name]
+            if m then return m end
+            error("AttributeError: 'dict' object has no attribute '" .. name .. "'")
         end
         if obj._pytype == "function" then
             if name == "__name__" then return obj.name or "<unknown>" end
@@ -619,7 +708,7 @@ function M.set_attr(obj, name, val)
     error("AttributeError: cannot set attribute '" .. name .. "' on " .. type(obj))
 end
 
---- Subscript read: obj[key]  (0-based integer key for sequences).
+--- Subscript read: obj[key]  (0-based integer key for sequences, hash key for dicts).
 function M.get_subscript(obj, key)
     if type(obj) == "string" then
         local n = #obj
@@ -627,25 +716,63 @@ function M.get_subscript(obj, key)
         if i < 1 or i > n then error("IndexError: string index out of range") end
         return obj:sub(i, i)
     end
-    if type(obj) == "table" and (obj._pytype == "list" or obj._pytype == nil) then
-        local n = #obj
-        local i = key >= 0 and key + 1 or n + key + 1
-        if i < 1 or i > n then error("IndexError: list index out of range") end
-        local v = obj[i]
-        return v ~= nil and v or M.PyNone
+    if type(obj) == "table" then
+        if obj._pytype == "dict" then
+            local v = obj.data[key]
+            if v == nil then error("KeyError: " .. M.py_repr(key)) end
+            return v
+        end
+        if obj._pytype == "list" or obj._pytype == nil then
+            local n = #obj
+            local i = key >= 0 and key + 1 or n + key + 1
+            if i < 1 or i > n then error("IndexError: list index out of range") end
+            local v = obj[i]
+            return v ~= nil and v or M.PyNone
+        end
     end
     error("TypeError: '" .. M.py_str(obj) .. "' object is not subscriptable")
 end
 
---- Subscript write: obj[key] = val  (0-based integer key for sequences).
+--- Subscript write: obj[key] = val.
 function M.set_subscript(obj, key, val)
-    if type(obj) == "table" and (obj._pytype == "list" or obj._pytype == nil) then
-        local n = #obj
-        local i = key >= 0 and key + 1 or n + key + 1
-        obj[i] = val
-        return
+    if type(obj) == "table" then
+        if obj._pytype == "dict" then
+            if obj.data[key] == nil then
+                obj.keys[#obj.keys + 1] = key
+            end
+            obj.data[key] = val
+            return
+        end
+        if obj._pytype == "list" or obj._pytype == nil then
+            local n = #obj
+            local i = key >= 0 and key + 1 or n + key + 1
+            obj[i] = val
+            return
+        end
     end
     error("TypeError: '" .. M.py_str(obj) .. "' object does not support item assignment")
+end
+
+--- Subscript delete: del obj[key].
+function M.del_subscript(obj, key)
+    if type(obj) == "table" then
+        if obj._pytype == "dict" then
+            if obj.data[key] == nil then error("KeyError: " .. M.py_repr(key)) end
+            obj.data[key] = nil
+            for i, k in ipairs(obj.keys) do
+                if k == key then table.remove(obj.keys, i); break end
+            end
+            return
+        end
+        if obj._pytype == "list" then
+            local n = #obj
+            local i = key >= 0 and key + 1 or n + key + 1
+            if i < 1 or i > n then error("IndexError: list assignment index out of range") end
+            table.remove(obj, i)
+            return
+        end
+    end
+    error("TypeError: '" .. M.py_str(obj) .. "' object does not support item deletion")
 end
 
 return M

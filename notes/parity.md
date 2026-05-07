@@ -21,7 +21,9 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | COMPARE_OP | done | |
 | IS_OP, CONTAINS_OP | done | |
 | UNARY_NOT, UNARY_NEGATIVE, UNARY_INVERT | done | |
-| BUILD_LIST, BUILD_TUPLE, BUILD_MAP, BUILD_SET | partial | LIST and TUPLE done; MAP and SET missing |
+| BUILD_LIST, BUILD_TUPLE, BUILD_MAP, BUILD_SET | partial | LIST, TUPLE, MAP done; SET missing |
+| BUILD_CONST_KEY_MAP | done | constant-key dict literals |
+| DELETE_SUBSCR | done | `del d[k]`, `del lst[i]` |
 | BUILD_STRING | done | f-string concatenation |
 | LIST_EXTEND, LIST_APPEND | partial | LIST_EXTEND done; LIST_APPEND missing |
 | DICT_MERGE, DICT_UPDATE, SET_ADD, MAP_ADD | missing | |
@@ -49,7 +51,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | str | done | methods: upper, lower, strip, split, join, replace, find, index, startswith, endswith, count, is*, zfill, center, ljust, rjust |
 | list | done | methods: append, extend, pop, insert, remove, sort, reverse, index, count, clear, copy |
 | tuple | partial | create/iterate/unpack work; no methods |
-| dict | missing | |
+| dict | done | insertion-ordered; methods: `keys`, `values`, `items`, `get`, `setdefault`, `pop`, `update`, `clear`, `copy`. Tuple keys not supported (Lua identity semantics) |
 | set | missing | |
 | range | done | used as iterator; no slicing or len |
 | bytes / bytearray | missing | |
