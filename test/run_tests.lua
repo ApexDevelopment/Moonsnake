@@ -49,6 +49,44 @@ local function parse_test_header(filepath)
     return expect_success, expected_output
 end
 
+--- Check which pyc files are newer than their source .py files.
+--- Writes a Python helper script to avoid command-line quoting issues.
+--- Stderr goes to the terminal; stdout is captured via a temp file.
+--- Returns a set (table with pyc_path keys) of files that are up-to-date.
+local function find_fresh_pycs(file_pairs)
+    if #file_pairs == 0 then return {} end
+
+    local is_windows  = package.config:sub(1,1) == "\\"
+    local script_path = "test/.pyc_cache/_check_mtimes.py"
+    local out_path    = "test/.pyc_cache/_fresh_list.txt"
+
+    local f = assert(io.open(script_path, "w"))
+    f:write("import os\npairs = [\n")
+    for _, p in ipairs(file_pairs) do
+        -- %q produces a double-quoted, escaped string literal valid in both Lua and Python
+        f:write(string.format("  (%q, %q),\n", p[1], p[2]))
+    end
+    f:write("]\nfor src, pyc in pairs:\n")
+    f:write("    if os.path.exists(pyc) and os.path.getmtime(pyc) >= os.path.getmtime(src):\n")
+    f:write("        print(pyc)\n")
+    f:close()
+
+    local redirect = is_windows
+        and (' > "' .. out_path .. '"')
+        or  (" > '"  .. out_path .. "'")
+    os.execute('python "' .. script_path .. '"' .. redirect)
+
+    local fresh = {}
+    local g = io.open(out_path, "r")
+    if g then
+        for line in g:lines() do
+            fresh[line:gsub("\r$", "")] = true
+        end
+        g:close()
+    end
+    return fresh
+end
+
 --- Compile a .py file to .pyc using CPython.
 --- Returns the path to the .pyc file, or nil + error message.
 local function compile_py(py_path, pyc_path)
@@ -151,13 +189,28 @@ local function main()
         os.execute("mkdir -p " .. pyc_dir)
     end
 
+    -- Build py→pyc pairs and find which caches are already fresh (one Python call).
+    local pyc_paths = {}
+    local file_pairs = {}
+    for _, py_path in ipairs(test_files) do
+        local test_name = py_path:match("test/(.+)%.py$")
+        local pyc_path = pyc_dir .. "/" .. test_name .. ".pyc"
+        pyc_paths[py_path] = pyc_path
+        file_pairs[#file_pairs + 1] = { py_path, pyc_path }
+    end
+    local fresh_pycs = find_fresh_pycs(file_pairs)
+
     for _, py_path in ipairs(test_files) do
         local test_name = py_path:match("test/(.+)%.py$")
         local expect_success, expected_output = parse_test_header(py_path)
 
-        -- Compile
-        local pyc_path = pyc_dir .. "/" .. test_name .. ".pyc"
-        local compiled, compile_err = compile_py(py_path, pyc_path)
+        local pyc_path = pyc_paths[py_path]
+        local compiled, compile_err
+        if fresh_pycs[pyc_path] then
+            compiled = pyc_path  -- cache hit, skip compilation
+        else
+            compiled, compile_err = compile_py(py_path, pyc_path)
+        end
 
         if not compiled then
             failed = failed + 1
