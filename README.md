@@ -28,6 +28,25 @@ See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature bre
 - Import system
 - Many builtins (`enumerate`, `zip`, `map`, `filter`, `sorted`, `reversed`, …)
 
+# Roadmap
+
+Planned implementation order, roughly by impact-to-effort ratio.
+
+### 1. Dict type
+`BUILD_MAP`, `BINARY_SUBSCR`/`STORE_SUBSCR` on dicts, and the core dict methods (`keys`, `values`, `items`, `get`, `update`, `pop`). Unlocks memoization, frequency counting, graph adjacency maps, and most algorithms that currently need an awkward list-of-pairs workaround.
+
+### 2. File I/O
+Add `open` as a native builtin returning a file object with `read`, `write`, `readline`, `readlines`, and context manager support (`__enter__`/`__exit__` via `BEFORE_WITH`). Makes Moonsnake useful for real text-processing scripts.
+
+### 3. `enumerate`, `zip`, and other iteration builtins
+`enumerate`, `zip`, `map`, `filter`, `reversed`, `sorted` — all implementable as native iterators without any new opcodes. Cleans up a large class of for-loop patterns that currently require manual index tracking.
+
+### 4. Closures over locals
+`LOAD_DEREF`, `STORE_DEREF`, `MAKE_CELL`, `COPY_FREE_VARS` — the cell/free variable machinery that CPython uses for inner functions that close over outer locals. Required for decorators, factory functions, and `nonlocal`.
+
+### 5. …
+*More to be decided.*
+
 # Testing
 
 Tests are located under `test/`. Each test is a Python script with a header comment that specifies the expected output. The test runner compiles `.py` files to `.pyc` via CPython 3.13, then runs them through the Lua VM.
