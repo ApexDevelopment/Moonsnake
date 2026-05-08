@@ -108,6 +108,23 @@ end
 --- Must be distinct from any Python value.
 local CALL_NULL = { _sentinel = "CALL_NULL" }
 
+--- Builtins captured at execute() entry so iterator-builtins (map, filter,
+--- sorted) can dispatch to PyFunction callables without threading the
+--- builtins table through every iterator step.
+M._current_builtins = nil
+
+--- Invoke any callable (native Lua function or PyFunction) with a list of args.
+--- Used by map/filter/sorted to call user-supplied callables from inside
+--- a builtin, where we don't have direct access to the call site's frame.
+function M.call_any(callable, args)
+    if type(callable) == "function" then
+        return callable(unpack(args))
+    elseif type(callable) == "table" and callable._pytype == "function" then
+        return M.call_pyfunction(callable, args, M._current_builtins)
+    end
+    error("TypeError: '" .. tostring(callable) .. "' object is not callable")
+end
+
 function M.exec_frame(frame)
     local bytecode_len = #frame.code.co_code / 2  -- total instruction words
 
@@ -865,6 +882,7 @@ end
 ---------------------------------------------------------------------------
 
 function M.execute(code, builtins_table)
+    M._current_builtins = builtins_table
     local globals = {}
     local frame = Frame.new(code, globals, {}, builtins_table)
     return M.exec_frame(frame)

@@ -61,24 +61,24 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 
 ## Built-in Functions
 
-| Function | Status |
-|---|---|
-| print | done |
-| len | done |
-| range | done |
-| int, str, bool, abs | done |
-| min, max | done |
-| type | partial (returns string, not a real type object) |
-| input | missing |
-| enumerate | missing |
-| zip | missing |
-| map, filter | missing |
-| sorted, reversed | missing |
-| list, tuple, dict, set | missing |
+| Function | Status | Notes |
+|---|---|---|
+| print | done | |
+| len | done | |
+| range | done | |
+| int, str, bool, abs | done | |
+| min, max | done | |
+| type | partial | returns string, not a real type object |
+| input | missing | |
+| enumerate | done | accepts optional `start` |
+| zip | done | stops at shortest |
+| map, filter | done | dispatches to Lua or PyFunction callables |
+| sorted, reversed | partial | positional-only; no `key`/`reverse` (kw-only, blocked on CALL_KW) |
+| list, tuple, dict, set | missing | |
 | open | done | returns file object; supports r/w/a and binary modes |
-| hasattr, getattr, setattr | missing |
-| isinstance, issubclass | missing |
-| repr | missing (used internally; not exposed as builtin) |
+| hasattr, getattr, setattr | missing | |
+| isinstance, issubclass | missing | |
+| repr | missing | used internally; not exposed as builtin |
 
 ## Language Features
 
