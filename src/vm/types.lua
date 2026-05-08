@@ -101,6 +101,9 @@ function M.py_str(val)
     if type(val) == "table" and val._pytype == "function" then
         return "<function " .. (val.name or "?") .. ">"
     end
+    if type(val) == "table" and val._pytype == "file" then
+        return "<_io.TextIOWrapper name='" .. tostring(val._name) .. "' mode='" .. tostring(val._mode) .. "' encoding='UTF-8'>"
+    end
     if type(val) == "table" and val._pytype == "list" then
         local parts = {}
         for i = 1, #val do
@@ -663,6 +666,88 @@ local dict_methods = {
     end,
 }
 
+---------------------------------------------------------------------------
+-- File object
+---------------------------------------------------------------------------
+
+local file_methods = {
+    read = function(self, n)
+        if self._closed then error("ValueError: I/O operation on closed file") end
+        if n == nil or n == M.PyNone then
+            return self._handle:read("*a") or ""
+        end
+        if type(n) == "number" then
+            if n < 0 then return self._handle:read("*a") or "" end
+            return self._handle:read(n) or ""
+        end
+        error("TypeError: read() argument must be int or None")
+    end,
+
+    readline = function(self)
+        if self._closed then error("ValueError: I/O operation on closed file") end
+        -- Read char-by-char so we can preserve the \n (Lua "*l" strips it)
+        local buf = {}
+        while true do
+            local c = self._handle:read(1)
+            if c == nil then break end
+            buf[#buf + 1] = c
+            if c == "\n" then break end
+        end
+        return table.concat(buf)
+    end,
+
+    readlines = function(self)
+        if self._closed then error("ValueError: I/O operation on closed file") end
+        local lines = { _pytype = "list" }
+        while true do
+            local buf = {}
+            while true do
+                local c = self._handle:read(1)
+                if c == nil then break end
+                buf[#buf + 1] = c
+                if c == "\n" then break end
+            end
+            if #buf == 0 then break end
+            lines[#lines + 1] = table.concat(buf)
+        end
+        return lines
+    end,
+
+    write = function(self, s)
+        if self._closed then error("ValueError: I/O operation on closed file") end
+        if type(s) ~= "string" then
+            error("TypeError: write() argument must be str, not '" .. type(s) .. "'")
+        end
+        self._handle:write(s)
+        return #s
+    end,
+
+    close = function(self)
+        if not self._closed then
+            self._handle:close()
+            self._closed = true
+        end
+        return M.PyNone
+    end,
+
+    __enter__ = function(self)
+        return self
+    end,
+
+    __exit__ = function(self, ...)
+        if not self._closed then
+            self._handle:close()
+            self._closed = true
+        end
+        return false
+    end,
+}
+
+--- Construct a file object wrapping a Lua file handle.
+function M.PyFile(handle, name, mode)
+    return { _pytype = "file", _handle = handle, _name = name, _mode = mode, _closed = false }
+end
+
 --- Return the named attribute from obj, or error with AttributeError.
 --- Methods are returned as raw functions taking (self, ...).
 function M.get_attr(obj, name)
@@ -681,6 +766,11 @@ function M.get_attr(obj, name)
             local m = dict_methods[name]
             if m then return m end
             error("AttributeError: 'dict' object has no attribute '" .. name .. "'")
+        end
+        if obj._pytype == "file" then
+            local m = file_methods[name]
+            if m then return m end
+            error("AttributeError: '_io.TextIOWrapper' object has no attribute '" .. name .. "'")
         end
         if obj._pytype == "function" then
             if name == "__name__" then return obj.name or "<unknown>" end

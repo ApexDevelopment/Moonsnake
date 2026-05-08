@@ -57,8 +57,15 @@ local function find_fresh_pycs(file_pairs)
     if #file_pairs == 0 then return {} end
 
     local is_windows  = package.config:sub(1,1) == "\\"
-    local script_path = "test/.pyc_cache/_check_mtimes.py"
-    local out_path    = "test/.pyc_cache/_fresh_list.txt"
+    local tmp_dir     = "test/.tmp"
+    local script_path = tmp_dir .. "/_check_mtimes.py"
+    local out_path    = tmp_dir .. "/_fresh_list.txt"
+
+    if is_windows then
+        os.execute('if not exist "' .. tmp_dir .. '" mkdir "' .. tmp_dir .. '"')
+    else
+        os.execute("mkdir -p " .. tmp_dir)
+    end
 
     local f = assert(io.open(script_path, "w"))
     f:write("import os\npairs = [\n")

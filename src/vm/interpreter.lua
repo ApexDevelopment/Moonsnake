@@ -790,6 +790,23 @@ function M.exec_frame(frame)
             frame:push(d)
 
         ---------------------------------------------------------------
+        -- BEFORE_WITH
+        -- Stack before: [..., mgr]
+        -- Stack after:  [..., bound_exit, enter_result]
+        -- bound_exit stays below the body and is consumed by the CALL 2
+        -- at the end of the with-block (3 Nones pushed: 2 args + self_or_null slot).
+        ---------------------------------------------------------------
+        elseif opcode == op.BEFORE_WITH then
+            local mgr = frame:pop()
+            local exit_fn  = types.get_attr(mgr, "__exit__")
+            local enter_fn = types.get_attr(mgr, "__enter__")
+            -- Bind exit to mgr so the cleanup CALL can invoke it without self
+            local bound_exit = function(...) return exit_fn(mgr, ...) end
+            frame:push(bound_exit)
+            local enter_result = enter_fn(mgr)
+            frame:push(enter_result)
+
+        ---------------------------------------------------------------
         -- EXTENDED_ARG — next instruction's arg is (this arg << 8 | next arg)
         ---------------------------------------------------------------
         elseif opcode == op.EXTENDED_ARG then

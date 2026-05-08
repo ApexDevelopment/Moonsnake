@@ -12,12 +12,13 @@ The virtual machine is under active development and can execute a meaningful sub
 
 ## What Works
 
-- Variables, arithmetic, comparisons, boolean logic
+- Variables, arithmetic, comparisons, boolean logic, bitwise operators
 - if/elif/else, while, for (over range, list, str)
 - Functions: user-defined, recursion, closures over globals
 - str, dict, and list with full method suites, subscript access (`s[0]`, `lst[-1]`)
 - f-strings with format specs (`.2f`, `:x`, width/alignment) and `!r`/`!s`/`!a`
-- Builtins: `print`, `len`, `range`, `int`, `str`, `bool`, `abs`, `min`, `max`, `type`
+- File I/O: `open`, `read`, `write`, `readline`, `readlines`, `close`, `with` statement
+- Builtins: `print`, `len`, `range`, `int`, `str`, `bool`, `abs`, `min`, `max`, `type`, `open`
 - Marshal/pyc loading for CPython 3.13 files
 
 See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature breakdown.
@@ -27,7 +28,7 @@ See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature bre
 - Classes and objects
 - Exception handling (try/except/finally)
 - Closures over locals (LOAD_DEREF / MAKE_CELL)
-- Dict and set types
+- Set type
 - Comprehensions
 - Import system
 - Many builtins (`enumerate`, `zip`, `map`, `filter`, `sorted`, `reversed`, …)
@@ -39,8 +40,8 @@ Planned implementation order, roughly by impact-to-effort ratio.
 ### 1. ~~Dict type~~ ✓
 Done. `BUILD_MAP`, `BUILD_CONST_KEY_MAP`, `DELETE_SUBSCR`, dict access via `BINARY_SUBSCR`/`STORE_SUBSCR`, and the core dict methods (`keys`, `values`, `items`, `get`, `setdefault`, `pop`, `update`, `clear`, `copy`). Insertion-ordered to match Python 3.7+ semantics.
 
-### 2. File I/O
-Add `open` as a native builtin returning a file object with `read`, `write`, `readline`, `readlines`, and context manager support (`__enter__`/`__exit__` via `BEFORE_WITH`). Makes Moonsnake useful for real text-processing scripts.
+### 2. ~~File I/O~~ ✓
+Done. `open` builtin returns a file object with `read`, `write`, `readline`, `readlines`, `close`, and full context manager support (`with open(...) as f:`) via `BEFORE_WITH`.
 
 ### 3. `enumerate`, `zip`, and other iteration builtins
 `enumerate`, `zip`, `map`, `filter`, `reversed`, `sorted` — all implementable as native iterators without any new opcodes. Cleans up a large class of for-loop patterns that currently require manual index tracking.
@@ -69,4 +70,6 @@ Test format:
 print("hello", "world")
 ```
 
-There are currently 46 passing tests covering arithmetic, comparisons, control flow, for/while loops, recursion, function calls, builtins, string formatting, string/list methods, and subscript access.
+There are currently 58 passing tests covering arithmetic, comparisons, control flow, for/while loops, recursion, function calls, builtins, string formatting, string/list/dict methods, subscript access, bitwise operators, and file I/O.
+
+Compiled `.pyc` files are cached in `test/.pyc_cache/` and reused across runs when the source hasn't changed — a cold run compiles everything via CPython; a warm run skips straight to the VM.

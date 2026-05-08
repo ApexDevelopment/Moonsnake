@@ -36,6 +36,8 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | POP_JUMP_IF_FALSE/TRUE/NONE/NOT_NONE | done | |
 | JUMP_FORWARD, JUMP_BACKWARD | done | |
 | EXTENDED_ARG | missing | limits functions to <256 locals/consts |
+| BEFORE_WITH | done | context manager entry; happy-path `with` works |
+| WITH_EXCEPT_START | missing | exception path inside `with` blocks |
 | PUSH_EXC_INFO, POP_EXCEPT, RAISE_VARARGS, RERAISE | missing | exception handling |
 | IMPORT_NAME, IMPORT_FROM | missing | import system |
 | RESUME, NOP, CACHE | done | treated as no-ops |
@@ -53,6 +55,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | tuple | partial | create/iterate/unpack work; no methods |
 | dict | done | insertion-ordered; methods: `keys`, `values`, `items`, `get`, `setdefault`, `pop`, `update`, `clear`, `copy`. Tuple keys not supported (Lua identity semantics) |
 | set | missing | |
+| file | done | methods: read, readline, readlines, write, close; context manager via \_\_enter\_\_/\_\_exit\_\_ |
 | range | done | used as iterator; no slicing or len |
 | bytes / bytearray | missing | |
 
@@ -72,7 +75,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | map, filter | missing |
 | sorted, reversed | missing |
 | list, tuple, dict, set | missing |
-| open | missing |
+| open | done | returns file object; supports r/w/a and binary modes |
 | hasattr, getattr, setattr | missing |
 | isinstance, issubclass | missing |
 | repr | missing (used internally; not exposed as builtin) |
@@ -95,7 +98,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | Inheritance | missing | |
 | Exception handling (try/except/finally) | missing | |
 | raise | missing | |
-| with / context managers | missing | |
+| with / context managers | partial | happy path works; exceptions inside `with` not handled |
 | Generators / yield | missing | |
 | async / await | missing | |
 | Decorators | missing | |

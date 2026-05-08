@@ -157,6 +157,20 @@ function M.bool(x)
 end
 
 ---------------------------------------------------------------------------
+-- open(path, mode='r')
+---------------------------------------------------------------------------
+function M.open(path, mode)
+    if mode == nil or mode == types.PyNone then mode = "r" end
+    -- Map Python modes to Lua modes
+    local lua_mode = mode:gsub("b", "")  -- strip 'b' for binary; Lua handles both
+    local handle, err = io.open(path, lua_mode)
+    if not handle then
+        error("FileNotFoundError: [Errno 2] No such file or directory: '" .. path .. "': " .. tostring(err))
+    end
+    return types.PyFile(handle, path, mode)
+end
+
+---------------------------------------------------------------------------
 -- Builtin namespace: a table mapping name -> function
 ---------------------------------------------------------------------------
 M.builtins = {
@@ -170,6 +184,7 @@ M.builtins = {
     min   = M.min,
     max   = M.max,
     bool  = M.bool,
+    open  = M.open,
 }
 
 return M
