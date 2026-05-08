@@ -10,7 +10,8 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | LOAD_FAST, STORE_FAST, STORE_NAME, STORE_GLOBAL | done | |
 | LOAD_FAST_LOAD_FAST, STORE_FAST_LOAD_FAST, STORE_FAST_STORE_FAST | done | super-instructions |
 | LOAD_ATTR, STORE_ATTR | done | method-call variant (is_method flag) supported |
-| LOAD_DEREF, STORE_DEREF, MAKE_CELL, COPY_FREE_VARS | missing | closures over locals |
+| LOAD_DEREF, STORE_DEREF, MAKE_CELL, COPY_FREE_VARS | done | closures over locals; cells stored inline in locals array |
+| SET_FUNCTION_ATTRIBUTE | partial | closure flag (0x08) done; defaults/kwdefaults/annotations stored but not enforced |
 | LOAD_BUILD_CLASS | missing | needed for class definitions |
 | POP_TOP, PUSH_NULL, RETURN_VALUE, RETURN_CONST | done | |
 | MAKE_FUNCTION | done | |
@@ -92,7 +93,7 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | Functions (def) | done | recursion, multiple args, globals closure |
 | Default / keyword arguments | missing | |
 | *args / **kwargs | missing | |
-| Closures over locals | missing | LOAD_DEREF not implemented |
+| Closures over locals | done | inner functions, nonlocal writes, decorators |
 | Lambda | missing | |
 | Classes (class) | missing | |
 | Inheritance | missing | |
@@ -101,10 +102,10 @@ Status of Python 3.13 features in the Lua VM. "Partial" means common cases work 
 | with / context managers | partial | happy path works; exceptions inside `with` not handled |
 | Generators / yield | missing | |
 | async / await | missing | |
-| Decorators | missing | |
+| Decorators | done | basic `@decorator` form works |
 | List / dict / set comprehensions | missing | |
 | f-strings | done | format specs and !r/!s/!a conversions |
 | String % formatting | missing | |
 | Walrus operator (:=) | missing | |
 | Import system | missing | |
-| Global / nonlocal declarations | partial | global works; nonlocal requires LOAD_DEREF |
+| Global / nonlocal declarations | done | both supported |

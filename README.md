@@ -8,7 +8,7 @@ Moonsnake is a project that aims to be a zero-dependency Python implementation i
 
 ## Current Status
 
-The virtual machine is under active development and can execute a meaningful subset of Python 3.13 bytecode. The compiler has not been started yet.
+The virtual machine can execute a significant subset of Python 3.13 bytecode. The compiler has not been started yet.
 
 ## What Works
 
@@ -19,39 +19,20 @@ The virtual machine is under active development and can execute a meaningful sub
 - f-strings with format specs (`.2f`, `:x`, width/alignment) and `!r`/`!s`/`!a`
 - File I/O: `open`, `read`, `write`, `readline`, `readlines`, `close`, `with` statement
 - Iteration: `enumerate`, `zip`, `map`, `filter`, `reversed`, `sorted`
+- Closures over locals: inner functions capture outer locals; `nonlocal` writes; decorators
 - Builtins: `print`, `len`, `range`, `int`, `str`, `bool`, `abs`, `min`, `max`, `type`, `open`
 - Marshal/pyc loading for CPython 3.13 files
 
 See `notes/parity.md` for a complete opcode-by-opcode and feature-by-feature breakdown.
 
-## What's Not Yet Implemented
+## What Doesn't Work Yet
 
 - Classes and objects
 - Exception handling (try/except/finally)
-- Closures over locals (LOAD_DEREF / MAKE_CELL)
 - Set type
 - Comprehensions
 - Import system
 - Many builtins (`input`, `hasattr`, `getattr`, `isinstance`, …)
-
-# Roadmap
-
-Planned implementation order, roughly by impact-to-effort ratio.
-
-### 1. ~~Dict type~~ ✓
-Done. `BUILD_MAP`, `BUILD_CONST_KEY_MAP`, `DELETE_SUBSCR`, dict access via `BINARY_SUBSCR`/`STORE_SUBSCR`, and the core dict methods (`keys`, `values`, `items`, `get`, `setdefault`, `pop`, `update`, `clear`, `copy`). Insertion-ordered to match Python 3.7+ semantics.
-
-### 2. ~~File I/O~~ ✓
-Done. `open` builtin returns a file object with `read`, `write`, `readline`, `readlines`, `close`, and full context manager support (`with open(...) as f:`) via `BEFORE_WITH`.
-
-### 3. ~~`enumerate`, `zip`, and other iteration builtins~~ ✓
-Done. All six (`enumerate`, `zip`, `map`, `filter`, `reversed`, `sorted`) implemented as native iterators. `map`/`filter` dispatch to either Lua functions or `PyFunction` callables via a shared `interpreter.call_any` helper. `sorted` is positional-only (no `key`/`reverse`) until `CALL_KW` lands.
-
-### 4. Closures over locals
-`LOAD_DEREF`, `STORE_DEREF`, `MAKE_CELL`, `COPY_FREE_VARS` — the cell/free variable machinery that CPython uses for inner functions that close over outer locals. Required for decorators, factory functions, and `nonlocal`.
-
-### 5. …
-*More to be decided.*
 
 # Testing
 
@@ -71,6 +52,4 @@ Test format:
 print("hello", "world")
 ```
 
-There are currently 65 passing tests covering arithmetic, comparisons, control flow, for/while loops, recursion, function calls, builtins, string formatting, string/list/dict methods, subscript access, bitwise operators, file I/O, and iteration builtins (enumerate/zip/map/filter/reversed/sorted).
-
-Compiled `.pyc` files are cached in `test/.pyc_cache/` and reused across runs when the source hasn't changed — a cold run compiles everything via CPython; a warm run skips straight to the VM.
+Compiled `.pyc` files are cached in `test/.pyc_cache/` and reused across runs when the source hasn't changed.

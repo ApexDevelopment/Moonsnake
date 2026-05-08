@@ -22,12 +22,13 @@ local op = opcodes.opmap  -- shorthand: op.LOAD_CONST, etc.
 local Frame = {}
 Frame.__index = Frame
 
-function Frame.new(code, globals, locals, builtins)
+function Frame.new(code, globals, locals, builtins, closure)
     local self = setmetatable({}, Frame)
     self.code     = code
     self.globals  = globals      -- table: name -> value
-    self.locals   = locals or {} -- table: index (0-based) -> value
+    self.locals   = locals or {} -- table: index (0-based) -> value (or cell for cellvars/freevars)
     self.builtins = builtins     -- table: name -> value
+    self.closure  = closure      -- tuple of cells from the function's __closure__ (or nil)
     self.stack    = {}           -- value stack for this frame
     self.sp       = 0            -- stack pointer (index of top element, 0 = empty)
     self.ip       = 0            -- instruction pointer (word index, 0-based)
@@ -283,11 +284,19 @@ function M.exec_frame(frame)
                 args[i] = frame:pop()
             end
 
-            -- Pop self_or_null (NULL sentinel or bound self)
+            -- Pop self_or_null (NULL sentinel, bound self, or — when the
+            -- compiler skipped PUSH_NULL — an implicit first arg, e.g. for
+            -- decorators: `LOAD_NAME deco, LOAD_CONST code, MAKE_FUNCTION, CALL 0`
+            -- pushes the function into the self_or_null slot to save a PUSH_NULL.)
             local self_or_null = frame:pop()
 
             -- Pop the callable
             local callable = frame:pop()
+
+            -- If self_or_null isn't the NULL sentinel, it's an implicit first arg.
+            if self_or_null ~= CALL_NULL then
+                table.insert(args, 1, self_or_null)
+            end
 
             -- Invoke
             local result
@@ -807,6 +816,70 @@ function M.exec_frame(frame)
             frame:push(d)
 
         ---------------------------------------------------------------
+        -- MAKE_CELL idx — wrap locals[idx] in a cell.
+        -- For cellvars that are also parameters, the slot already holds
+        -- the arg value; for plain cellvars it's nil. Either way the
+        -- cell starts with whatever was in the slot.
+        ---------------------------------------------------------------
+        elseif opcode == op.MAKE_CELL then
+            frame.locals[arg] = types.PyCell(frame.locals[arg])
+
+        ---------------------------------------------------------------
+        -- LOAD_DEREF idx — push contents of the cell at locals[idx].
+        ---------------------------------------------------------------
+        elseif opcode == op.LOAD_DEREF then
+            local cell = frame.locals[arg]
+            if cell == nil or cell.contents == nil then
+                local name = frame.code.co_localsplusnames
+                    and frame.code.co_localsplusnames[arg + 1]
+                    or ("deref#" .. arg)
+                error("NameError: free variable '" .. name .. "' referenced before assignment in enclosing scope")
+            end
+            frame:push(cell.contents)
+
+        ---------------------------------------------------------------
+        -- STORE_DEREF idx — store TOS into the cell at locals[idx].
+        ---------------------------------------------------------------
+        elseif opcode == op.STORE_DEREF then
+            local val = frame:pop()
+            frame.locals[arg].contents = val
+
+        ---------------------------------------------------------------
+        -- COPY_FREE_VARS n — copy n cells from the function's closure
+        -- into the last n slots of locals (the freevar region).
+        ---------------------------------------------------------------
+        elseif opcode == op.COPY_FREE_VARS then
+            if frame.closure == nil then
+                error("VM error: COPY_FREE_VARS without closure")
+            end
+            local total = #frame.code.co_localsplusnames
+            for i = 1, arg do
+                frame.locals[total - arg + i - 1] = frame.closure[i]
+            end
+
+        ---------------------------------------------------------------
+        -- SET_FUNCTION_ATTRIBUTE flag
+        -- Stack: [..., attr_value, function]  (function is TOS)
+        -- Sets the named attribute on the function and pushes it back.
+        -- flag bits: 0x01=defaults, 0x02=kwdefaults, 0x04=annotations, 0x08=closure
+        ---------------------------------------------------------------
+        elseif opcode == op.SET_FUNCTION_ATTRIBUTE then
+            local func = frame:pop()
+            local attr_value = frame:pop()
+            if arg == 8 then
+                func.closure = attr_value  -- tuple of cells
+            elseif arg == 1 then
+                func.defaults = attr_value
+            elseif arg == 2 then
+                func.kwdefaults = attr_value
+            elseif arg == 4 then
+                func.annotations = attr_value
+            else
+                error("NotImplementedError: SET_FUNCTION_ATTRIBUTE flag " .. arg)
+            end
+            frame:push(func)
+
+        ---------------------------------------------------------------
         -- BEFORE_WITH
         -- Stack before: [..., mgr]
         -- Stack after:  [..., bound_exit, enter_result]
@@ -873,7 +946,7 @@ function M.call_pyfunction(func, args, builtins)
         end
     end
 
-    local frame = Frame.new(code, func.globals, locals, builtins)
+    local frame = Frame.new(code, func.globals, locals, builtins, func.closure)
     return M.exec_frame(frame)
 end
 

@@ -38,7 +38,15 @@ function M.PyFunction(code, globals, name)
         code     = code,
         globals  = globals,
         name     = name or code.co_name or "<unknown>",
+        closure  = nil,  -- tuple of cells; set by SET_FUNCTION_ATTRIBUTE 8
     }
+end
+
+--- Create a cell object — a mutable box used by closures.
+--- Both the enclosing function (cellvar) and inner function (freevar)
+--- access the same cell, so writes from either side are visible to the other.
+function M.PyCell(value)
+    return { _pytype = "cell", contents = value }
 end
 
 ---------------------------------------------------------------------------
