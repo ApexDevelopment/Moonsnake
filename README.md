@@ -6,6 +6,12 @@ Moonsnake is a project that aims to be a zero-dependency Python implementation i
 
 ## Why
 
+## Warning
+
+This project is heavily vibecoded, don't take it seriously and don't expect it to be performant or production ready; though I can't imagine a single scenario where you would want to use this in prod. If that sounds like you, we should talk.
+
+Notes in `/notes` are written by and for LLMs, and may be incomplete, inaccurate, or generally not useful to a human.
+
 ## Current Status
 
 The virtual machine can execute a significant subset of Python 3.13 bytecode. The compiler has not been started yet.
